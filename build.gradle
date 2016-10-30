@@ -1,0 +1,179 @@
+buildscript {
+    repositories {
+        jcenter()
+
+        maven {
+            url "https://plugins.gradle.org/m2/"
+        }
+        maven {
+            url "http://packages.confluent.io/maven/"
+        }
+    }
+    dependencies {
+        classpath "com.github.jengelman.gradle.plugins:shadow:1.2.3"
+        //classpath "com.github.maiflai:gradle-scalatest:0.14"
+    }
+}
+
+String scalaVersion="2.11"
+String scalatestVersion = "2.2.4"
+
+String kafkaVersion = "0.10.0.0"
+String confluentVersion = "3.0.0"
+String avroVersion = "1.8.1"
+String avro4sVersion = "1.6.1"
+
+String junitVersion = "4.12"
+String bouncycastleVersion = "1.54"
+String apacheDirectoryVersion = "2.0.0-M22"
+String apacheDirectoryApiVersion = "1.0.0-M33"
+
+allprojects {
+
+    apply plugin: "java"
+    //apply plugin: "scala"
+    apply plugin: "maven"
+    //apply plugin: "com.github.maiflai.scalatest"
+    sourceCompatibility = 1.8
+    targetCompatibility = 1.8
+
+    repositories {
+
+        mavenLocal()
+        maven {
+            url "http://packages.confluent.io/maven/"
+        }
+        mavenCentral()
+
+
+    }
+
+    dependencies {
+        compile "org.scala-lang:scala-library:2.11.8"
+        compile "log4j:log4j:1.2.17"
+        compile "org.slf4j:slf4j-log4j12:1.7.12"
+        compile "org.slf4j:jul-to-slf4j:1.7.12"
+        testRuntime "org.pegdown:pegdown:1.1.0"
+        testCompile "org.mockito:mockito-all:1.10.19"
+    }
+
+    test {
+        maxParallelForks = 1
+        minHeapSize = "256m"
+        maxHeapSize = "2048m"
+        jvmArgs "-XX:MaxPermSize=1G"
+    }
+
+    task testJar(type: Jar, dependsOn: testClasses) {
+        baseName = "test-${project.archivesBaseName}"
+        from sourceSets.test.output
+    }
+
+    configurations {
+        tests
+    }
+
+    artifacts {
+        tests testJar
+    }
+
+    tasks.withType(Tar) {
+        compression Compression.GZIP
+        extension = "tgz"
+    }
+
+    group = "com.datamountaineer"
+
+}
+
+subprojects {
+    // Common behaviour for all distributable projects
+    afterEvaluate { Project project ->
+        if (project.plugins.hasPlugin("application")) {
+
+            jar.manifest {
+                attributes(
+                        "application-name": "${applicationName}",
+                        "build-number": "${System.env.BUILD_NUMBER}",
+                        "git-commit": "${System.env.BUILD_VCS_NUMBER}"
+                )
+            }
+
+        }
+
+        if (project.plugins.hasPlugin("com.github.johnrengelman.shadow")) {
+            shadowJar {
+                zip64 true
+                mergeServiceFiles()
+                dependencies {
+                   
+                }
+            }
+        }
+    }
+}
+
+
+project(":kafka-cluster-testing") {
+    apply plugin: "com.github.johnrengelman.shadow"
+
+    dependencies {
+        compile "org.apache.kafka:kafka_${scalaVersion}:${kafkaVersion}"
+
+        compile group: "org.apache.kafka", name: "kafka_${scalaVersion}", version: "${kafkaVersion}", classifier: "test"
+        compile group: "org.apache.kafka", name: "kafka-clients", version: "${kafkaVersion}", classifier: 'test'
+        compile "org.slf4j:slf4j-log4j12:1.7.12"
+
+        compile "io.confluent:kafka-schema-registry:${confluentVersion}"
+        compile "io.confluent:kafka-schema-registry-client:${confluentVersion}"
+        compile "org.apache.kafka:kafka-clients:${kafkaVersion}"
+        compile "io.confluent:kafka-avro-serializer:${confluentVersion}"
+        compile "org.apache.avro:avro:${avroVersion}"
+        compile "org.apache.avro:avro-maven-plugin:${avroVersion}"
+        //compile "com.sksamuel.avro4s:avro4s-core_${scalaVersion}:${avro4sVersion}"
+
+
+
+        compile("io.confluent:common-config:$confluentVersion")
+        compile("io.confluent:common-utils:$confluentVersion")
+        compile("io.confluent:rest-utils:$confluentVersion")
+
+        compile "junit:junit:${junitVersion}"
+
+        compile "org.bouncycastle:bcpkix-jdk15on:${bouncycastleVersion}"
+        compile("org.apache.directory.api:api-all:${apacheDirectoryApiVersion}") {
+            exclude group: "xml-apis", module: "xml-apis"
+            exclude group: "org.apache.directory.api", module: "api-ldap-schema-data"
+        }
+        compile("org.apache.directory.server:apacheds-core-api:${apacheDirectoryVersion}") {
+            exclude group: "org.apache.directory.api", module: "api-ldap-schema-data"
+        }
+
+        compile("org.apache.directory.server:apacheds-interceptor-kerberos:${apacheDirectoryVersion}") {
+            exclude group: "org.apache.directory.api", module: "api-ldap-schema-data"
+        }
+
+        compile("org.apache.directory.server:apacheds-protocol-shared:${apacheDirectoryVersion}") {
+            exclude group: "org.apache.directory.api", module: "api-ldap-schema-data"
+        }
+        compile("org.apache.directory.server:apacheds-protocol-kerberos:${apacheDirectoryVersion}") {
+            exclude group: "org.apache.directory.api", module: "api-ldap-schema-data"
+        }
+
+        compile("org.apache.directory.server:apacheds-protocol-ldap:${apacheDirectoryVersion}") {
+            exclude group: "org.apache.directory.api", module: "api-ldap-schema-data"
+        }
+
+        compile("org.apache.directory.server:apacheds-ldif-partition:${apacheDirectoryVersion}") {
+            exclude group: "org.apache.directory.api", module: "api-ldap-schema-data"
+        }
+        compile("org.apache.directory.server:apacheds-mavibot-partition:${apacheDirectoryVersion}") {
+            exclude group: "org.apache.directory.api", module: "api-ldap-schema-data"
+        }
+        compile("org.apache.directory.server:apacheds-jdbm-partition:${apacheDirectoryVersion}") {
+            exclude group: "org.apache.directory.api", module: "api-ldap-schema-data"
+        }
+    }
+}
+
+
